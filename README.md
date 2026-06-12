@@ -21,7 +21,7 @@
 ### Из исходного кода
 
 ```bash
-git clone https://github.com/your-org/tor-https-bridge.git
+git clone git@github.com:Olvik-P/tor_https_bridge.git
 cd tor-https-bridge
 pip install .
 ```
@@ -35,7 +35,7 @@ pip install -e ".[dev]"
 ### Через pip из GitHub
 
 ```bash
-pip install git+https://github.com/your-org/tor-https-bridge.git
+pip install git+https://github.com/Olvik-P/tor_https_bridge.git
 ```
 
 ## Быстрый старт
