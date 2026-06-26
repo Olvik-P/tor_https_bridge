@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from contextlib import asynccontextmanager
-from typing import AsyncIterator
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -24,16 +22,24 @@ from tor_https_bridge.core.handler import ClientHandler
 
 
 def _make_connector_that_raises(error: Exception) -> MagicMock:
-    """Create a mock connector whose connect() raises the given error."""
+    """Create a mock connector whose connect() returns a context manager
+    that raises the given error on __aenter__."""
     connector = MagicMock()
 
-    @asynccontextmanager
+    class _RaisingConnection:
+        """Mock connection that raises on __aenter__."""
+
+        async def __aenter__(self) -> MagicMock:
+            raise error
+
+        async def __aexit__(self, *args) -> None:
+            pass
+
     async def _connect_that_raises(
         host: str,
         port: int,
-    ) -> AsyncIterator[MagicMock]:
-        raise error
-        yield MagicMock()  # pragma: no cover
+    ) -> _RaisingConnection:
+        return _RaisingConnection()
 
     connector.connect = _connect_that_raises
     return connector
@@ -82,6 +88,7 @@ class TestClientHandlerHandle:
         handler._parser.read_request.assert_awaited_once_with(
             mock_reader,
             handler._settings.max_request_size,
+            timeout=handler._settings.read_timeout,
         )
         handler._parser.parse_connect.assert_called_once()
         mock_writer.write.assert_any_call(HTTP_200_CONNECTED)

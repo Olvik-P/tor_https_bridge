@@ -86,6 +86,8 @@ def print_banner(
     connect_timeout: int,
     read_timeout: int,
     sanitize_headers: bool = False,
+    socks_host: str | None = None,
+    socks_port: int | None = None,
 ) -> None:
     """Print startup banner with configuration summary.
 
@@ -98,22 +100,32 @@ def print_banner(
         connect_timeout: Connection timeout in seconds.
         read_timeout: Read timeout in seconds.
         sanitize_headers: Whether header sanitization is enabled.
+        socks_host: SOCKS5 proxy listen host (if enabled).
+        socks_port: SOCKS5 proxy listen port (if enabled).
     """
     stealth_status = "ON (headers sanitized)" if sanitize_headers else "OFF"
+
+    listen_parts = [f"HTTPS {https_host}:{https_port}"]
+    if socks_host is not None and socks_port is not None:
+        listen_parts.append(f"SOCKS5 {socks_host}:{socks_port}")
+    listen_str = ", ".join(listen_parts)
 
     # Собираем баннер из частей
     banner_lines = [
         f"{_TOP_LEFT}{_HORIZ * (_WIDTH - 2)}{_TOP_RIGHT}",
         f"{_VERT}{' ' * 18}🔒 Tor HTTPS Bridge Proxy{' ' * 34}{_VERT}",
-        f"{_VERT}  Listen:     {https_host}:{https_port:<42}{' ' * 11}{_VERT}",
+        f"{_VERT}  Listen:     {listen_str:<55}{' ' * 8}{_VERT}",
         f"{_VERT}  Backend:    SOCKS5 {tor_host}:{tor_port:<36}"
         f"{' ' * 10}{_VERT}",
         f"{_VERT}  Buffer:     {buffer_size} bytes{' ' * 53}{_VERT}",
         f"{_VERT}  Timeout:    {connect_timeout}s (connect), "
         f"{read_timeout}s (read){' ' * 37}{_VERT}",
         f"{_VERT}  Stealth:    {stealth_status:<49}{' ' * 14}{_VERT}",
-        f"{_VERT}  Configure Windows Proxy: http://{https_host}:{https_port}"
-        f"{' ' * 29}{_VERT}",
+        f"{_VERT}  Configure:  HTTP proxy http://{https_host}:{https_port}"
+        f"{' ' * 33}{_VERT}",
+        f"{_VERT}              SOCKS5 proxy "
+        f"{socks_host or https_host}:{socks_port or https_port}"
+        f"{' ' * 38}{_VERT}",
         f"{_VERT}  Press Ctrl+C to stop{' ' * 55}{_VERT}",
         f"{_BOTTOM_LEFT}{_HORIZ * (_WIDTH - 2)}{_BOTTOM_RIGHT}",
     ]

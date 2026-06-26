@@ -12,6 +12,7 @@ import pytest_asyncio
 from tor_https_bridge.config.settings import Settings
 from tor_https_bridge.core.forwarder import DataForwarder
 from tor_https_bridge.core.handler import ClientHandler
+from tor_https_bridge.core.socks_handler import SOCKS5ClientHandler
 from tor_https_bridge.protocol.http_parser import HTTPConnectParser
 from tor_https_bridge.protocol.socks_adapter import TorConnector
 
@@ -125,6 +126,20 @@ def handler(
     return ClientHandler(
         settings=settings,
         parser=mock_parser,
+        connector=mock_connector,
+        forwarder=mock_forwarder,
+    )
+
+
+@pytest.fixture
+def socks_handler(
+    settings: Settings,
+    mock_connector: AsyncMock,
+    mock_forwarder: AsyncMock,
+) -> SOCKS5ClientHandler:
+    """Return a SOCKS5ClientHandler with mocked dependencies."""
+    return SOCKS5ClientHandler(
+        settings=settings,
         connector=mock_connector,
         forwarder=mock_forwarder,
     )

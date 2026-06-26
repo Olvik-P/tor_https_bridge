@@ -84,7 +84,8 @@ class ClientHandler:
         await writer.drain()
 
         try:
-            async with self._connector.connect(host, port) as tor_sock:
+            conn = await self._connector.connect(host, port)
+            async with conn as tor_sock:
                 tor_reader, tor_writer = await asyncio.open_connection(
                     sock=tor_sock,
                 )
@@ -102,12 +103,9 @@ class ClientHandler:
                         await tor_writer.wait_closed()
                     except (ConnectionError, OSError):
                         pass
-        except GeneratorExit:
-            # GeneratorExit is raised when the event loop is shutting down
-            # and a task is being cancelled.  We must re-raise it so the
-            # caller can handle it properly.
+        except asyncio.CancelledError:
             logger.debug(
-                "%s: Connect cancelled during shutdown (GeneratorExit)",
+                "%s: Connect cancelled during shutdown",
                 client_addr,
             )
             raise
@@ -147,7 +145,8 @@ class ClientHandler:
             )
 
         try:
-            async with self._connector.connect(host, port) as tor_sock:
+            conn = await self._connector.connect(host, port)
+            async with conn as tor_sock:
                 tor_reader, tor_writer = await asyncio.open_connection(
                     sock=tor_sock,
                 )
@@ -178,12 +177,9 @@ class ClientHandler:
                         await tor_writer.wait_closed()
                     except (ConnectionError, OSError):
                         pass
-        except GeneratorExit:
-            # GeneratorExit is raised when the event loop is shutting down
-            # and a task is being cancelled.  We must re-raise it so the
-            # caller can handle it properly.
+        except asyncio.CancelledError:
             logger.debug(
-                "%s: HTTP request cancelled during shutdown (GeneratorExit)",
+                "%s: HTTP request cancelled during shutdown",
                 client_addr,
             )
             raise
@@ -205,6 +201,7 @@ class ClientHandler:
             request_data = await self._parser.read_request(
                 reader,
                 self._settings.max_request_size,
+                timeout=self._settings.read_timeout,
             )
             host, port, method = self._parser.parse_connect(request_data)
 
@@ -226,6 +223,13 @@ class ClientHandler:
                     client_addr,
                 )
 
+        except asyncio.TimeoutError:
+            logger.warning(
+                "%s: Request read timeout (%ds)",
+                client_addr,
+                self._settings.read_timeout,
+            )
+
         except ProxyProtocolError as e:
             logger.warning("%s: Protocol error - %s", client_addr, e)
             try:
@@ -242,13 +246,14 @@ class ClientHandler:
             except (ConnectionError, OSError):
                 pass
 
-        except (ConnectionError, OSError, asyncio.TimeoutError) as e:
+        except (ConnectionError, OSError) as e:
             logger.debug("%s: Connection error - %s", client_addr, e)
 
         except GeneratorExit:
-            # GeneratorExit is raised when the event loop is shutting down
-            # or when a task is cancelled on Windows ProactorEventLoop.
-            # We must not log it as an error — it's a normal shutdown signal.
+            # GeneratorExit is raised when the task is cancelled during
+            # shutdown on Python 3.13+.  Do NOT re-raise — the caller
+            # (_on_client) handles it and must not propagate it to
+            # asyncio's StreamReaderProtocol.
             logger.debug(
                 "%s: Connection cancelled (GeneratorExit)", client_addr
             )
@@ -271,5 +276,13 @@ class ClientHandler:
             try:
                 writer.close()
                 await writer.wait_closed()
+            except GeneratorExit:
+                # GeneratorExit during shutdown — close synchronously
+                # and suppress to prevent propagation into
+                # StreamReaderProtocol.
+                try:
+                    writer.close()
+                except (ConnectionError, OSError):
+                    pass
             except (ConnectionError, OSError):
                 pass

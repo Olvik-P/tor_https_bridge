@@ -135,5 +135,5 @@ test.db
 .vscode/
 *.db
 logs/
-pyproject.toml  
+AGENTS.md
 

@@ -43,7 +43,7 @@ class TestNetworkConstants:
         assert TOR_SOCKS_DEFAULT_PORT == 9050
 
     def test_https_proxy_default_host(self) -> None:
-        assert HTTPS_PROXY_DEFAULT_HOST == "127.0.0.1"
+        assert HTTPS_PROXY_DEFAULT_HOST == "0.0.0.0"
 
     def test_https_proxy_default_port(self) -> None:
         assert HTTPS_PROXY_DEFAULT_PORT == 3128

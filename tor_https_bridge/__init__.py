@@ -1,11 +1,12 @@
 """Tor HTTPS Bridge Proxy.
 
-Transparently forwards HTTPS proxy traffic to Tor SOCKS5.
+Transparently forwards HTTPS CONNECT and SOCKS5 proxy traffic to Tor
+SOCKS5.
 
 A production-ready Python package that listens for HTTPS CONNECT proxy
-requests and tunnels them through the Tor SOCKS5 proxy, providing
-anonymous browsing for any application configured to use an HTTP(S)
-proxy.
+requests and/or SOCKS5 connections, automatically detects the protocol,
+and tunnels them through the Tor SOCKS5 proxy, providing anonymous
+browsing for any application.
 
 Usage::
 

@@ -107,8 +107,9 @@ class TestTorConnectorConnect:
         connector = TorConnector(settings)
         mock_sock = MagicMock(spec=socks.socksocket)
 
-        with patch.object(connector, "_create_socket", return_value=mock_sock):
-            async with connector.connect("example.com", 443) as sock:
+        with patch.object(connector, "_do_create_socket", return_value=mock_sock):
+            conn = await connector.connect("example.com", 443)
+            async with conn as sock:
                 assert sock is mock_sock
 
             mock_sock.close.assert_called_once()
@@ -123,14 +124,15 @@ class TestTorConnectorConnect:
 
         with patch.object(
             connector,
-            "_create_socket",
+            "_do_create_socket",
             side_effect=ConnectionError("connection refused"),
         ) as mock_create:
             with pytest.raises(
                 ProxyConnectionError,
                 match="Failed to connect",
             ):
-                async with connector.connect("example.com", 443):
+                conn = await connector.connect("example.com", 443)
+                async with conn:
                     pass  # pragma: no cover
 
             # Should have been called: initial + retry_count attempts
@@ -142,14 +144,15 @@ class TestTorConnectorConnect:
 
         with patch.object(
             connector,
-            "_create_socket",
+            "_do_create_socket",
             side_effect=OSError("socket error"),
         ) as mock_create:
             with pytest.raises(
                 ProxyConnectionError,
                 match="Failed to connect",
             ):
-                async with connector.connect("example.com", 443):
+                conn = await connector.connect("example.com", 443)
+                async with conn:
                     pass  # pragma: no cover
 
             assert mock_create.call_count == settings.socks_retry_count + 1
@@ -160,14 +163,15 @@ class TestTorConnectorConnect:
 
         with patch.object(
             connector,
-            "_create_socket",
+            "_do_create_socket",
             side_effect=asyncio.TimeoutError("timed out"),
         ) as mock_create:
             with pytest.raises(
                 ProxyConnectionError,
                 match="Failed to connect",
             ):
-                async with connector.connect("example.com", 443):
+                conn = await connector.connect("example.com", 443)
+                async with conn:
                     pass  # pragma: no cover
 
             assert mock_create.call_count == settings.socks_retry_count + 1
@@ -181,10 +185,11 @@ class TestTorConnectorConnect:
         # First call fails, second succeeds
         with patch.object(
             connector,
-            "_create_socket",
+            "_do_create_socket",
             side_effect=[ConnectionError("first fail"), mock_sock],
         ):
-            async with connector.connect("example.com", 443) as sock:
+            conn = await connector.connect("example.com", 443)
+            async with conn as sock:
                 assert sock is mock_sock
 
             mock_sock.close.assert_called_once()
@@ -195,9 +200,10 @@ class TestTorConnectorConnect:
         connector = TorConnector(settings)
         mock_sock = MagicMock(spec=socks.socksocket)
 
-        with patch.object(connector, "_create_socket", return_value=mock_sock):
+        with patch.object(connector, "_do_create_socket", return_value=mock_sock):
+            conn = await connector.connect("example.com", 443)
             with pytest.raises(RuntimeError):
-                async with connector.connect("example.com", 443):
+                async with conn:
                     raise RuntimeError("test error")
 
             mock_sock.close.assert_called_once()
@@ -212,8 +218,9 @@ class TestTorConnectorConnect:
         mock_sock = MagicMock(spec=socks.socksocket)
         mock_sock.close.side_effect = OSError("close error")
 
-        with patch.object(connector, "_create_socket", return_value=mock_sock):
-            async with connector.connect("example.com", 443) as sock:
+        with patch.object(connector, "_do_create_socket", return_value=mock_sock):
+            conn = await connector.connect("example.com", 443)
+            async with conn as sock:
                 assert sock is mock_sock
 
             mock_sock.close.assert_called_once()

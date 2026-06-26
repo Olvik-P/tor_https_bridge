@@ -28,6 +28,8 @@ from tor_https_bridge.config.constants import (
     MIN_PORT,
     READ_TIMEOUT,
     SANITIZE_HEADERS_DEFAULT,
+    SOCKS_PROXY_DEFAULT_HOST,
+    SOCKS_PROXY_DEFAULT_PORT,
     SOCKS_RETRY_COUNT,
     SOCKS_RETRY_DELAY,
     TOR_SOCKS_DEFAULT_HOST,
@@ -80,7 +82,35 @@ class Settings(BaseSettings):
         le=MAX_PORT,
     )
 
+    # --- SOCKS5 Proxy (incoming) ---
+    socks_proxy_enabled: bool = Field(
+        default=True,
+        description="Enable SOCKS5 proxy on the listen port",
+    )
+    socks_proxy_host: str = Field(
+        default=SOCKS_PROXY_DEFAULT_HOST,
+        description="SOCKS5 proxy listen host",
+    )
+    socks_proxy_port: int = Field(
+        default=SOCKS_PROXY_DEFAULT_PORT,
+        description="SOCKS5 proxy listen port",
+        ge=MIN_PORT,
+        le=MAX_PORT,
+    )
+    socks_proxy_username: Optional[str] = Field(
+        default=None,
+        description="SOCKS5 username for RFC 1929 auth (None = no auth)",
+    )
+    socks_proxy_password: Optional[str] = Field(
+        default=None,
+        description="SOCKS5 password for RFC 1929 auth",
+    )
+
     # --- HTTPS Proxy ---
+    https_proxy_enabled: bool = Field(
+        default=True,
+        description="Enable HTTPS CONNECT proxy on the listen port",
+    )
     https_proxy_host: str = Field(
         default=HTTPS_PROXY_DEFAULT_HOST,
         description="HTTPS proxy listen host",
@@ -183,12 +213,43 @@ class Settings(BaseSettings):
             raise ValueError(msg)
         return upper
 
-    @field_validator("tor_socks_host", "https_proxy_host")
+    @field_validator("tor_socks_host")
     @classmethod
-    def validate_host(cls, v: str) -> str:
-        """Validate hostname is not empty and within length limits."""
+    def validate_tor_socks_host(cls, v: str) -> str:
+        """Validate Tor SOCKS host is not empty, within length limits,
+        and not set to 0.0.0.0 (which is invalid for outbound connections).
+
+        ``0.0.0.0`` is a bind address, not a connect address. Using it
+        as the Tor SOCKS host causes ``WinError 10049`` on Windows
+        (``WSAEADDRNOTAVAIL``).
+        """
         if not v or len(v) > 255:
-            msg = f"Invalid host: {v!r}"
+            msg = f"Invalid tor_socks_host: {v!r}"
+            raise ValueError(msg)
+        if v == "0.0.0.0":
+            msg = (
+                "tor_socks_host cannot be 0.0.0.0 — this is a bind address, "
+                "not a connect address. Use 127.0.0.1 (local Tor) or the "
+                "actual IP/hostname of the remote Tor SOCKS proxy."
+            )
+            raise ValueError(msg)
+        return v
+
+    @field_validator("https_proxy_host")
+    @classmethod
+    def validate_https_proxy_host(cls, v: str) -> str:
+        """Validate HTTPS proxy host is not empty and within length limits."""
+        if not v or len(v) > 255:
+            msg = f"Invalid https_proxy_host: {v!r}"
+            raise ValueError(msg)
+        return v
+
+    @field_validator("socks_proxy_host")
+    @classmethod
+    def validate_socks_proxy_host(cls, v: str) -> str:
+        """Validate SOCKS5 proxy host is not empty and within length limits."""
+        if not v or len(v) > 255:
+            msg = f"Invalid socks_proxy_host: {v!r}"
             raise ValueError(msg)
         return v
 

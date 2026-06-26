@@ -85,6 +85,10 @@ class DataForwarder:
                 await writer.drain()
         except (ConnectionError, OSError) as e:
             logger.debug("%s: Connection closed - %s", name, e)
+        except GeneratorExit:
+            # GeneratorExit is raised during task cancellation on
+            # Python 3.13+. Exit cleanly without logging as error.
+            pass
         except asyncio.CancelledError:
             # Task was cancelled during shutdown — exit cleanly
             logger.debug("%s: Forwarding cancelled", name)
@@ -116,47 +120,66 @@ class DataForwarder:
             self.forward_one_way(reader2, writer1, "tor->client"),
         )
 
-        done, pending = await asyncio.wait(
-            [task1, task2],
-            return_when=asyncio.FIRST_COMPLETED,
-        )
+        try:
+            done, pending = await asyncio.wait(
+                [task1, task2],
+                return_when=asyncio.FIRST_COMPLETED,
+            )
 
-        # Instead of task.cancel() (which triggers WinError 6 on
-        # Windows ProactorEventLoop when the underlying handle is
-        # already closed), close the writer of the pending task.
-        # This causes the pending forward_one_way to exit naturally
-        # via ConnectionError/OSError on its next read/write.
-        for task in pending:
-            # Determine which writer belongs to the pending task
-            if task is task1:
-                # task1 = forward_one_way(reader1, writer2, ...)
-                # Close writer2 so task1's write/drain fails
-                try:
-                    writer2.close()
-                except OSError:
-                    pass
-            else:
-                # task2 = forward_one_way(reader2, writer1, ...)
-                # Close writer1 so task2's write/drain fails
-                try:
-                    writer1.close()
-                except OSError:
-                    pass
+            # Instead of task.cancel() (which triggers WinError 6 on
+            # Windows ProactorEventLoop when the underlying handle is
+            # already closed), close the writer of the pending task.
+            # This causes the pending forward_one_way to exit naturally
+            # via ConnectionError/OSError on its next read/write.
+            for task in pending:
+                # Determine which writer belongs to the pending task
+                if task is task1:
+                    # task1 = forward_one_way(reader1, writer2, ...)
+                    # Close writer2 so task1's write/drain fails
+                    try:
+                        writer2.close()
+                    except OSError:
+                        pass
+                else:
+                    # task2 = forward_one_way(reader2, writer1, ...)
+                    # Close writer1 so task2's write/drain fails
+                    try:
+                        writer1.close()
+                    except OSError:
+                        pass
 
-        # Wait for both tasks to finish naturally.
-        # Use return_exceptions=True to prevent CancelledError from
-        # propagating if a task was cancelled during shutdown.
-        results = await asyncio.gather(
-            *pending,
-            return_exceptions=True,
-        )
-        # Log any unexpected exceptions (but not CancelledError)
-        for result in results:
-            if isinstance(result, Exception) and not isinstance(
-                result,
-                (asyncio.CancelledError, ConnectionError, OSError),
-            ):
-                logger.error(
-                    "Unexpected error in forwarder: %s",
+            # Wait for both tasks to finish naturally.
+            # Use return_exceptions=True to prevent CancelledError from
+            # propagating if a task was cancelled during shutdown.
+            results = await asyncio.gather(
+                *pending,
+                return_exceptions=True,
+            )
+            # Log any unexpected exceptions (but not CancelledError)
+            for result in results:
+                if isinstance(result, Exception) and not isinstance(
                     result,
-                )
+                    (asyncio.CancelledError, ConnectionError, OSError),
+                ):
+                    logger.error(
+                        "Unexpected error in forwarder: %s",
+                        result,
+                    )
+        except GeneratorExit:
+            # GeneratorExit is raised during task cancellation on
+            # Python 3.13+. Cancel both tasks and exit cleanly.
+            # Do NOT await anything here — awaiting during GeneratorExit
+            # handling can trigger recursive GeneratorExit on Python 3.13
+            # + Windows ProactorEventLoop, causing "coroutine ignored
+            # GeneratorExit" errors.
+            for t in (task1, task2):
+                if not t.done():
+                    t.cancel()
+        except asyncio.CancelledError:
+            # If the whole forward_bidirectional is cancelled during
+            # shutdown, cancel both tasks and let them clean up.
+            for t in (task1, task2):
+                if not t.done():
+                    t.cancel()
+            # Wait for both to finish (ignore CancelledError results)
+            await asyncio.gather(task1, task2, return_exceptions=True)

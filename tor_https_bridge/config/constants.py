@@ -16,8 +16,14 @@ TOR_SOCKS_DEFAULT_HOST: Final[str] = "127.0.0.1"
 TOR_SOCKS_DEFAULT_PORT: Final[int] = 9050
 """Default Tor SOCKS5 port."""
 
-HTTPS_PROXY_DEFAULT_HOST: Final[str] = "127.0.0.1"
-"""Default HTTPS proxy listen host."""
+SOCKS_PROXY_DEFAULT_HOST: Final[str] = "0.0.0.0"
+"""Default SOCKS5 proxy listen host (all interfaces)."""
+
+SOCKS_PROXY_DEFAULT_PORT: Final[int] = 1080
+"""Default SOCKS5 proxy listen port."""
+
+HTTPS_PROXY_DEFAULT_HOST: Final[str] = "0.0.0.0"
+"""Default HTTPS proxy listen host (all interfaces)."""
 
 HTTPS_PROXY_DEFAULT_PORT: Final[int] = 3128
 """Default HTTPS proxy listen port."""

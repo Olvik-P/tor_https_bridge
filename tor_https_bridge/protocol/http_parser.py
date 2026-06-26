@@ -75,12 +75,15 @@ class HTTPConnectParser:
     async def read_request(
         reader: asyncio.StreamReader,
         max_size: int,
+        timeout: float | None = None,
     ) -> bytes:
         """Read HTTP request until double CRLF.
 
         Args:
             reader: Stream reader to read from.
             max_size: Maximum allowed request size in bytes.
+            timeout: Optional timeout in seconds for reading the request.
+                If None, no timeout is applied.
 
         Returns:
             Raw HTTP request bytes.
@@ -88,11 +91,20 @@ class HTTPConnectParser:
         Raises:
             ProxyProtocolError: If the request exceeds *max_size* or
                 the connection is closed prematurely.
+            asyncio.TimeoutError: If *timeout* seconds elapse before
+                the full request is received.
         """
         data = bytearray()
         while CRLF_DOUBLE not in data:
             remaining = max_size - len(data)
-            chunk = await reader.read(min(CHUNK_READ_SIZE, remaining))
+            read_size = min(CHUNK_READ_SIZE, remaining)
+            if timeout is not None:
+                chunk = await asyncio.wait_for(
+                    reader.read(read_size),
+                    timeout=timeout,
+                )
+            else:
+                chunk = await reader.read(read_size)
             if not chunk:
                 raise ProxyProtocolError(
                     "Connection closed before complete request",

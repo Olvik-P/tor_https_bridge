@@ -30,17 +30,20 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="tor-https-bridge",
         description=(
-            "Transparently forwards HTTPS proxy traffic to Tor SOCKS5."
+            "Transparently forwards HTTPS proxy and SOCKS5 traffic "
+            "to Tor SOCKS5."
         ),
-        epilog="Example: tor-https-bridge --proxy-port 8080 --tor-port 9150",
+        epilog=(
+            "Example: tor-https-bridge --proxy-port 8080 --tor-port 9150"
+        ),
     )
 
-    # Proxy settings
+    # HTTPS Proxy settings
     proxy_group = parser.add_argument_group("HTTPS Proxy")
     proxy_group.add_argument(
         "--proxy-host",
         default=None,
-        help="HTTPS proxy listen host (default: 127.0.0.1)",
+        help="HTTPS proxy listen host (default: 0.0.0.0)",
     )
     proxy_group.add_argument(
         "--proxy-port",
@@ -48,9 +51,45 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="HTTPS proxy listen port (default: 3128)",
     )
+    proxy_group.add_argument(
+        "--no-https-proxy",
+        action="store_true",
+        default=None,
+        help="Disable the HTTPS CONNECT proxy",
+    )
+
+    # SOCKS5 Proxy settings (incoming)
+    socks_group = parser.add_argument_group("SOCKS5 Proxy (incoming)")
+    socks_group.add_argument(
+        "--socks-host",
+        default=None,
+        help="SOCKS5 proxy listen host (default: 0.0.0.0)",
+    )
+    socks_group.add_argument(
+        "--socks-port",
+        type=int,
+        default=None,
+        help="SOCKS5 proxy listen port (default: 1080)",
+    )
+    socks_group.add_argument(
+        "--no-socks-proxy",
+        action="store_true",
+        default=None,
+        help="Disable the SOCKS5 proxy",
+    )
+    socks_group.add_argument(
+        "--socks-username",
+        default=None,
+        help="SOCKS5 username for RFC 1929 auth (default: no auth)",
+    )
+    socks_group.add_argument(
+        "--socks-password",
+        default=None,
+        help="SOCKS5 password for RFC 1929 auth",
+    )
 
     # Tor settings
-    tor_group = parser.add_argument_group("Tor SOCKS5")
+    tor_group = parser.add_argument_group("Tor SOCKS5 (backend)")
     tor_group.add_argument(
         "--tor-host",
         default=None,
@@ -84,13 +123,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--connect-timeout",
         type=int,
         default=None,
-        help="Connection timeout in seconds (default: 30)",
+        help="Connection timeout in seconds (default: 60)",
     )
     timeout_group.add_argument(
         "--read-timeout",
         type=int,
         default=None,
-        help="Read timeout in seconds (default: 60)",
+        help="Read timeout in seconds (default: 120)",
     )
 
     # Logging
@@ -144,12 +183,22 @@ def _apply_cli_overrides(
         "read_timeout": "read_timeout",
         "log_level": "log_level",
         "config": "config_file",
+        "socks_host": "socks_proxy_host",
+        "socks_port": "socks_proxy_port",
+        "socks_username": "socks_proxy_username",
+        "socks_password": "socks_proxy_password",
     }
 
     for arg_name, setting_name in arg_to_setting.items():
         value = getattr(args, arg_name, None)
         if value is not None:
             overrides[setting_name] = value
+
+    # Handle boolean flags
+    if getattr(args, "no_https_proxy", None) is True:
+        overrides["https_proxy_enabled"] = False
+    if getattr(args, "no_socks_proxy", None) is True:
+        overrides["socks_proxy_enabled"] = False
 
     return overrides
 
@@ -171,6 +220,16 @@ async def async_main(settings: Settings) -> None:
         connect_timeout=settings.connect_timeout,
         read_timeout=settings.read_timeout,
         sanitize_headers=settings.sanitize_headers,
+        socks_host=(
+            settings.socks_proxy_host
+            if settings.socks_proxy_enabled
+            else None
+        ),
+        socks_port=(
+            settings.socks_proxy_port
+            if settings.socks_proxy_enabled
+            else None
+        ),
     )
 
     proxy = TorHTTPSProxy(settings)

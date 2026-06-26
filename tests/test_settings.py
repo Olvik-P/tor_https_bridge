@@ -22,7 +22,7 @@ class TestSettingsDefaults:
         assert settings.tor_socks_port == 9050
 
     def test_default_https_proxy_host(self, settings: Settings) -> None:
-        assert settings.https_proxy_host == "127.0.0.1"
+        assert settings.https_proxy_host == "0.0.0.0"
 
     def test_default_https_proxy_port(self, settings: Settings) -> None:
         assert settings.https_proxy_port == 3128
@@ -137,13 +137,29 @@ class TestSettingsValidation:
         with pytest.raises(ValidationError):
             Settings(https_proxy_port=99999)
 
-    def test_invalid_host_empty(self) -> None:
-        with pytest.raises(ValidationError, match="Invalid host"):
+    def test_invalid_tor_socks_host_empty(self) -> None:
+        with pytest.raises(ValidationError, match="Invalid tor_socks_host"):
             Settings(tor_socks_host="")
 
-    def test_invalid_host_too_long(self) -> None:
-        with pytest.raises(ValidationError, match="Invalid host"):
+    def test_invalid_tor_socks_host_too_long(self) -> None:
+        with pytest.raises(ValidationError, match="Invalid tor_socks_host"):
             Settings(tor_socks_host="x" * 256)
+
+    def test_invalid_tor_socks_host_zero(self) -> None:
+        """0.0.0.0 is invalid for outbound SOCKS5 connections."""
+        with pytest.raises(
+            ValidationError,
+            match="tor_socks_host cannot be 0.0.0.0",
+        ):
+            Settings(tor_socks_host="0.0.0.0")
+
+    def test_invalid_https_proxy_host_empty(self) -> None:
+        with pytest.raises(ValidationError, match="Invalid https_proxy_host"):
+            Settings(https_proxy_host="")
+
+    def test_invalid_https_proxy_host_too_long(self) -> None:
+        with pytest.raises(ValidationError, match="Invalid https_proxy_host"):
+            Settings(https_proxy_host="x" * 256)
 
     def test_invalid_backlog_too_low(self) -> None:
         with pytest.raises(ValidationError):
