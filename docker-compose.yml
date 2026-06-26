@@ -1,13 +1,11 @@
 # =============================================================================
-# Docker Compose for Tor HTTPS Bridge Proxy (без встроенного Tor)
+# Docker Compose for Tor HTTPS Bridge Proxy with Web UI
 # =============================================================================
-# Использует Tor, запущенный на хостовой машине (Windows)
+# Uses Tor running on the host machine (Windows).
+# Web dashboard on port 8080, proxy ports 3128/1080.
 # =============================================================================
 
 services:
-  # ---------------------------------------------------------------------------
-  # Tor HTTPS Bridge Proxy (подключается к внешнему Tor)
-  # ---------------------------------------------------------------------------
   tor-https-bridge:
     build:
       context: .
@@ -15,24 +13,24 @@ services:
     container_name: tor-https-bridge-proxy
     restart: unless-stopped
     ports:
-      # HTTPS CONNECT proxy (внешний порт -> контейнер)
+      # Web dashboard
+      - "${WEB_PORT:-8080}:8080"
+      # HTTPS CONNECT proxy
       - "${HTTPS_PROXY_PORT:-3128}:3128"
-      # SOCKS5 proxy (внешний порт -> контейнер)
+      # SOCKS5 proxy
       - "${SOCKS_PROXY_PORT:-1080}:1080"
     environment:
-      # Подключаемся к ТОРУ НА ХОСТЕ (не в контейнере!)
+      # Tor on host
       - TOR_BRIDGE_TOR_SOCKS_HOST=host.docker.internal
       - TOR_BRIDGE_TOR_SOCKS_PORT=9050
-      # Настройки прокси
+      # Proxy settings
       - TOR_BRIDGE_HTTPS_PROXY_HOST=0.0.0.0
       - TOR_BRIDGE_HTTPS_PROXY_PORT=3128
       - TOR_BRIDGE_SOCKS_PROXY_HOST=0.0.0.0
       - TOR_BRIDGE_SOCKS_PROXY_PORT=1080
       - TOR_BRIDGE_LOG_LEVEL=${LOG_LEVEL:-INFO}
       - TOR_BRIDGE_SANITIZE_HEADERS=${SANITIZE_HEADERS:-false}
-    # Нет depends_on — мы не ждём Tor в контейнере
     extra_hosts:
-      # Важно! host.docker.internal работает только в Windows/Mac
       - "host.docker.internal:host-gateway"
     networks:
       - tor_network

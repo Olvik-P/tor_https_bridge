@@ -30,12 +30,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="tor-https-bridge",
         description=(
-            "Transparently forwards HTTPS proxy and SOCKS5 traffic "
-            "to Tor SOCKS5."
+            "Transparently forwards HTTPS proxy and SOCKS5 traffic to Tor SOCKS5."
         ),
-        epilog=(
-            "Example: tor-https-bridge --proxy-port 8080 --tor-port 9150"
-        ),
+        epilog=("Example: tor-https-bridge --proxy-port 8080 --tor-port 9150"),
     )
 
     # HTTPS Proxy settings
@@ -147,6 +144,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path to JSON/YAML config file",
     )
 
+    # Web UI
+    web_group = parser.add_argument_group("Web Interface")
+    web_group.add_argument(
+        "--web",
+        action="store_true",
+        default=False,
+        help="Enable web dashboard interface",
+    )
+    web_group.add_argument(
+        "--web-host",
+        default="0.0.0.0",
+        help="Web UI listen host (default: 0.0.0.0)",
+    )
+    web_group.add_argument(
+        "--web-port",
+        type=int,
+        default=8080,
+        help="Web UI listen port (default: 8080)",
+    )
+
     # Version
     parser.add_argument(
         "--version",
@@ -203,54 +220,65 @@ def _apply_cli_overrides(
     return overrides
 
 
-async def async_main(settings: Settings) -> None:
+async def async_main(
+    settings: Settings,
+    web: bool = False,
+    web_host: str = "0.0.0.0",
+    web_port: int = 8080,
+) -> None:
     """Async main entry point.
 
     Args:
         settings: Resolved application settings.
+        web: Enable web dashboard.
+        web_host: Web UI listen host.
+        web_port: Web UI listen port.
     """
     setup_logging(level=settings.log_level)
 
-    print_banner(
-        https_host=settings.https_proxy_host,
-        https_port=settings.https_proxy_port,
-        tor_host=settings.tor_socks_host,
-        tor_port=settings.tor_socks_port,
-        buffer_size=settings.buffer_size,
-        connect_timeout=settings.connect_timeout,
-        read_timeout=settings.read_timeout,
-        sanitize_headers=settings.sanitize_headers,
-        socks_host=(
-            settings.socks_proxy_host
-            if settings.socks_proxy_enabled
-            else None
-        ),
-        socks_port=(
-            settings.socks_proxy_port
-            if settings.socks_proxy_enabled
-            else None
-        ),
-    )
+    if web:
+        from tor_https_bridge.web.api import manager
+        from tor_https_bridge.web.app import start_web_server
 
-    proxy = TorHTTPSProxy(settings)
-
-    loop = asyncio.get_running_loop()
-
-    def _signal_handler() -> None:
-        # Use call_soon_threadsafe to schedule stop() on the event loop
-        # from the signal handler (which runs in a different context).
-        loop.call_soon_threadsafe(
-            lambda: asyncio.create_task(proxy.stop()),
+        manager._settings = settings
+        logger.info("Web dashboard at http://%s:%d", web_host, web_port)
+        logger.info("Use the web interface to start/stop the proxy.")
+        await start_web_server(host=web_host, port=web_port)
+    else:
+        print_banner(
+            https_host=settings.https_proxy_host,
+            https_port=settings.https_proxy_port,
+            tor_host=settings.tor_socks_host,
+            tor_port=settings.tor_socks_port,
+            buffer_size=settings.buffer_size,
+            connect_timeout=settings.connect_timeout,
+            read_timeout=settings.read_timeout,
+            sanitize_headers=settings.sanitize_headers,
+            socks_host=(
+                settings.socks_proxy_host if settings.socks_proxy_enabled else None
+            ),
+            socks_port=(
+                settings.socks_proxy_port if settings.socks_proxy_enabled else None
+            ),
         )
 
-    setup_signal_handlers(loop, _signal_handler)
+        proxy = TorHTTPSProxy(settings)
 
-    try:
-        await proxy.start()
-    except asyncio.CancelledError:
-        pass
-    finally:
-        await proxy.stop()
+        loop = asyncio.get_running_loop()
+
+        def _signal_handler() -> None:
+            loop.call_soon_threadsafe(
+                lambda: asyncio.create_task(proxy.stop()),
+            )
+
+        setup_signal_handlers(loop, _signal_handler)
+
+        try:
+            await proxy.start()
+        except asyncio.CancelledError:
+            pass
+        finally:
+            await proxy.stop()
 
 
 def main() -> None:
@@ -275,7 +303,14 @@ def main() -> None:
         settings = Settings(**{**settings.model_dump(), **cli_overrides})
 
     try:
-        asyncio.run(async_main(settings))
+        asyncio.run(
+            async_main(
+                settings,
+                web=args.web,
+                web_host=args.web_host,
+                web_port=args.web_port,
+            )
+        )
     except KeyboardInterrupt:
         print("\n\U0001f6d1 Shutdown complete.")
         sys.exit(0)

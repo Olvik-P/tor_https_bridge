@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tor HTTPS Bridge :: Control Matrix</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <canvas id="matrix-bg"></canvas>
+
+    <div class="overlay">
+        <header class="header">
+            <div class="header-left">
+                <span class="logo-icon">&#9760;</span>
+                <h1 class="glitch" data-text="TOR HTTPS BRIDGE">TOR HTTPS BRIDGE</h1>
+            </div>
+            <div class="header-right">
+                <span class="status-indicator" id="status-dot"></span>
+                <span id="status-text">OFFLINE</span>
+                <span class="version" id="version">v0.0.0</span>
+            </div>
+        </header>
+
+        <main class="main-grid">
+            <section class="panel control-panel">
+                <h2 class="panel-title">[ CONTROL ]</h2>
+                <div class="control-buttons">
+                    <button class="btn btn-start" id="btn-start" onclick="startProxy()">
+                        <span class="btn-icon">&#9654;</span> START
+                    </button>
+                    <button class="btn btn-stop" id="btn-stop" onclick="stopProxy()">
+                        <span class="btn-icon">&#9632;</span> STOP
+                    </button>
+                </div>
+                <div class="control-buttons">
+                    <button class="btn btn-exit" id="btn-exit" onclick="shutdownAll()">
+                        <span class="btn-icon">&#9760;</span> EXIT
+                    </button>
+                </div>
+                <div class="status-grid" id="status-info">
+                    <div class="status-row">
+                        <span class="label">HTTPS</span>
+                        <span class="value" id="https-status">--</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="label">SOCKS5</span>
+                        <span class="value" id="socks-status">--</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="label">CONNECTIONS</span>
+                        <span class="value" id="connections">0</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel settings-panel">
+                <h2 class="panel-title">[ SETTINGS ]</h2>
+                <div class="settings-scroll">
+                    <div class="setting-group">
+                        <h3 class="group-title">Tor Backend</h3>
+                        <div class="setting-row">
+                            <label>SOCKS Host</label>
+                            <input type="text" id="set-tor-host" placeholder="127.0.0.1">
+                        </div>
+                        <div class="setting-row">
+                            <label>SOCKS Port</label>
+                            <input type="number" id="set-tor-port" placeholder="9050">
+                        </div>
+                    </div>
+
+                    <div class="setting-group">
+                        <h3 class="group-title">HTTPS Proxy</h3>
+                        <div class="setting-row">
+                            <label>Listen Host</label>
+                            <input type="text" id="set-https-host" placeholder="0.0.0.0">
+                        </div>
+                        <div class="setting-row">
+                            <label>Listen Port</label>
+                            <input type="number" id="set-https-port" placeholder="3128">
+                        </div>
+                        <div class="setting-row">
+                            <label>Enabled</label>
+                            <label class="toggle">
+                                <input type="checkbox" id="set-https-enabled" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="setting-group">
+                        <h3 class="group-title">SOCKS5 Proxy</h3>
+                        <div class="setting-row">
+                            <label>Listen Host</label>
+                            <input type="text" id="set-socks-host" placeholder="0.0.0.0">
+                        </div>
+                        <div class="setting-row">
+                            <label>Listen Port</label>
+                            <input type="number" id="set-socks-port" placeholder="1080">
+                        </div>
+                        <div class="setting-row">
+                            <label>Enabled</label>
+                            <label class="toggle">
+                                <input type="checkbox" id="set-socks-enabled" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="setting-group">
+                        <h3 class="group-title">Performance</h3>
+                        <div class="setting-row">
+                            <label>Buffer Size</label>
+                            <input type="number" id="set-buffer-size" placeholder="8192">
+                        </div>
+                        <div class="setting-row">
+                            <label>Connect Timeout</label>
+                            <input type="number" id="set-connect-timeout" placeholder="60">
+                        </div>
+                        <div class="setting-row">
+                            <label>Read Timeout</label>
+                            <input type="number" id="set-read-timeout" placeholder="120">
+                        </div>
+                    </div>
+
+                    <div class="setting-group">
+                        <h3 class="group-title">Stealth Mode</h3>
+                        <div class="setting-row">
+                            <label>Sanitize Headers</label>
+                            <label class="toggle">
+                                <input type="checkbox" id="set-sanitize">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-apply" onclick="applySettings()">
+                        APPLY SETTINGS
+                    </button>
+                </div>
+            </section>
+
+            <section class="panel log-panel">
+                <h2 class="panel-title">[ SYSTEM LOG ]</h2>
+                <div class="log-container" id="log-container">
+                    <div class="log-line system">Waiting for connection...</div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <span>Tor HTTPS Bridge Proxy</span>
+            <span class="footer-sep">|</span>
+            <span id="footer-time"></span>
+        </footer>
+    </div>
+
+    <script src="/static/matrix.js"></script>
+</body>
+</html>
